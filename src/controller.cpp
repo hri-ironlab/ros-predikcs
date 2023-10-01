@@ -91,32 +91,20 @@ public:
         ros::param::get("/KCS_Controller/reward_params/limits", lim_weight);
         reward->SetParameters(dist_weight, jerk_weight, manip_weight, lim_weight);
 
-        ros::param::get("/KCS_Controller/user_model", user_model_type);
-        if(user_model_type == 0)
+        boost::shared_ptr<predikcs::GoalClassifierUserModel> goal_user(new predikcs::GoalClassifierUserModel(1, voo_spec->delta_t));
+        goal_user->SetRobotModel(robot);
+        int num_goals;
+        ros::param::get("KCS_Controller/num_goals", num_goals);
+        std::vector<std::vector<double>> goals;
+        for(int i = 0; i < num_goals; ++i)
         {
-            user = boost::shared_ptr<predikcs::UserModel>(new predikcs::UserModel(1, voo_spec->delta_t));
+            std::vector<double> goal_points;
+            ros::param::get("/KCS_Controller/goal_" + std::to_string(i + 1), goal_points);
+            goals.push_back(goal_points);
         }
-        else if (user_model_type == 1)
-        {
-            boost::shared_ptr<predikcs::GoalClassifierUserModel> goal_user(new predikcs::GoalClassifierUserModel(1, voo_spec->delta_t));
-            goal_user->SetRobotModel(robot);
-            int num_goals;
-            ros::param::get("KCS_Controller/num_goals", num_goals);
-            std::vector<std::vector<double>> goals;
-            for(int i = 0; i < num_goals; ++i)
-            {
-                std::vector<double> goal_points;
-                ros::param::get("/KCS_Controller/goal_" + std::to_string(i + 1), goal_points);
-                goals.push_back(goal_points);
-            }
-            goal_user->SetGoals(goals);
-            user = goal_user;
-            update_goal_probabilities = true;
-        }
-        else
-        {
-            baseline = true;
-        }
+        goal_user->SetGoals(goals);
+        user = goal_user;
+        update_goal_probabilities = true;
     }
 
     void JointUpdateCallback(const sensor_msgs::JointState::ConstPtr& msg)
@@ -212,36 +200,25 @@ public:
         {
             DecayCommand();
         }
-        else if (baseline)
-        {
-            boost::shared_ptr<predikcs::MotionState> current_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, last_joint_accelerations) );
-            current_state->CalculatePosition(robot);
-            double quat_x, quat_y, quat_z, quat_w;
-            current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
-            ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
-            voo_bandit->GetBaselineJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
-        }
-        else
-        {
-            user->SetLastVelocityCommand(last_velocity_command);
 
-            // Find best current null movement
-            boost::shared_ptr<predikcs::MotionState> current_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, last_joint_accelerations) );
+        user->SetLastVelocityCommand(last_velocity_command);
+
+        // Find best current null movement
+        boost::shared_ptr<predikcs::MotionState> current_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, last_joint_accelerations) );
+        
+        current_state->CalculatePosition(robot);
+        double quat_x, quat_y, quat_z, quat_w;
+        current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
+        ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
+        
+        voo_bandit->GetCurrentBestJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
+        if(update_goal_probabilities){
+            static_cast<predikcs::GoalClassifierUserModel*>(user.get())->UpdateProbabilities(current_state, last_velocity_command);
             
-            current_state->CalculatePosition(robot);
-            double quat_x, quat_y, quat_z, quat_w;
-            current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
-            ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
+            std::vector<double> current_probs;
+            static_cast<predikcs::GoalClassifierUserModel*>(user.get())->GetProbabilities(current_probs);
+            ROS_ERROR("Current probs: %.2f %.2f %.2f %.2f %.2f %.2f", current_probs[0], current_probs[1], current_probs[2], current_probs[3], current_probs[4], current_probs[5]);
             
-            voo_bandit->GetCurrentBestJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
-            if(update_goal_probabilities){
-                static_cast<predikcs::GoalClassifierUserModel*>(user.get())->UpdateProbabilities(current_state, last_velocity_command);
-                
-                std::vector<double> current_probs;
-                static_cast<predikcs::GoalClassifierUserModel*>(user.get())->GetProbabilities(current_probs);
-                ROS_ERROR("Current probs: %.2f %.2f %.2f %.2f %.2f %.2f", current_probs[0], current_probs[1], current_probs[2], current_probs[3], current_probs[4], current_probs[5]);
-                
-            }
         }
         PublishCommand();
         vel_command_waiting = false;
