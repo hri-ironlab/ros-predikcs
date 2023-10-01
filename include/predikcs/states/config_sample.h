@@ -38,15 +38,15 @@ public:
 
     void ResetSample();
 
-    double GetExpectedReward(const int start_timestep, const int num_timesteps, const double discount_factor, const std::vector<double>& joint_pos, const boost::shared_ptr<UserModel> user_model) const;
+    double GetExpectedReward(const int start_timestep, const int num_timesteps, const double discount_factor, const std::vector<double>& joint_pos, const boost::shared_ptr<UserModel> user_model, const double joint_dist_cutoff = 0.5) const;
 
     void GenerateRollouts(const boost::shared_ptr<MotionState> starting_state, const int num_rollouts, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model);
 
-    void GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, const std::vector<std::vector<double>>& predicted_joint_states, const std::vector<double>& rollout_rewards, const std::pair<int, double>& sample_probs);
+    void GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states, std::vector<double>& rollout_rewards, std::pair<int, double>& sample_probs);
 
-    double GetDistToSample(const Eigen::VectorXd* sample) const;
+    double GetDistToSample(const Eigen::VectorXd& sample) const;
 
-    void GetJointVelocities(const boost::shared_ptr<MotionState> joint_start_state, const std::vector<double>& ee_command, const std::vector<double>& joint_vels) const;
+    void GetJointVelocities(const boost::shared_ptr<MotionState> joint_start_state, std::vector<double> ee_command, std::vector<double>& joint_vels_out, const double gain = 0.2) const;
 
     std::vector<double> target_joint_pos;
 private:

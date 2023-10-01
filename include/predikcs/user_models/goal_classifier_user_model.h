@@ -45,14 +45,16 @@ public:
     void UpdateProbabilities(const boost::shared_ptr<MotionState> state, const std::vector<double>& velocities);
 
 private:
-    void CalculateProbabilities();
+    void CalculateProbabilities() const;
 
     boost::shared_ptr<RobotModel> robot_model_;
-    std::vector<boost::shared_ptr<KDL::Frame>> goals;
-    bool probs_updated_since_last_calc;
-    std::vector<double> goal_probabilities;
-    std::mutex goal_prob_lock;
+    std::vector<KDL::Frame> goals;
     std::vector<double> log_likelihoods;
+
+    // Cache variables
+    mutable bool probs_updated_since_last_calc;
+    mutable std::mutex goal_prob_lock;
+    mutable std::vector<double> goal_probabilities;
 };
 
 }

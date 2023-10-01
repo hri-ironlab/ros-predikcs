@@ -94,11 +94,11 @@ public:
 
     void GenerateSamples(boost::shared_ptr<MotionState> current_state, boost::shared_ptr<UserModel> user_model);
 
-    void GetCurrentBestJointVelocities(boost::shared_ptr<MotionState> current_state, std::vector<double>* current_ee_command, std::vector<double>* best_joint_velocities);
+    void GetCurrentBestJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out);
 
-    void GetBaselineJointVelocities(boost::shared_ptr<MotionState> current_state, std::vector<double>* current_ee_command, std::vector<double>* best_joint_velocities);
+    void GetBaselineJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out);
 
-    void GetCurrentBestConfig(std::vector<double>* best_config);
+    void GetCurrentBestConfig(std::vector<double>& best_config);
 
     boost::shared_ptr<VooSpec> bandit_spec_;
 private:

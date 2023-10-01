@@ -11,12 +11,12 @@
 namespace predikcs
 {
 
-double GetJointDist(boost::shared_ptr<RobotModel> robot_model_, std::vector<double>* joint_pos_1, std::vector<double>* joint_pos_2)
+double GetJointDist(const boost::shared_ptr<RobotModel> robot_model_, const std::vector<double>& joint_pos_1, const std::vector<double>& joint_pos_2)
 {
     double joint_dist_sum = 0.0;
-    for(int i = 0; i < joint_pos_1->size(); ++i)
+    for(int i = 0; i < joint_pos_1.size(); ++i)
     {
-        double joint_dist = abs((*joint_pos_1)[i] -(*joint_pos_2)[i]);
+        double joint_dist = abs(joint_pos_1[i] - joint_pos_2[i]);
         if(joint_dist > M_PI && robot_model_->GetJointPosUpLimit(i) == std::numeric_limits<double>::infinity())
         {
             joint_dist = abs(joint_dist - (2 * M_PI));
@@ -49,9 +49,8 @@ void ConfigSample::ResetSample()
     avg_timestep_scores_per_roll.clear();
 }
 
-double ConfigSample::GetExpectedReward(int start_timestep, int num_timesteps, double discount_factor, std::vector<double>* joint_pos, boost::shared_ptr<UserModel> user_model)
+double ConfigSample::GetExpectedReward(const int start_timestep, const int num_timesteps, const double discount_factor, const std::vector<double>& joint_pos, const boost::shared_ptr<UserModel> user_model, const double joint_dist_cutoff) const
 {
-    double joint_dist_cutoff = 0.5;
     if(null_sample)
     {
         return -std::numeric_limits<double>::infinity();
@@ -66,7 +65,7 @@ double ConfigSample::GetExpectedReward(int start_timestep, int num_timesteps, do
     double corrected_avg_reward = 0.0;
     for(int roll = 0; roll < avg_timestep_scores_per_roll.size(); ++roll)
     {
-        double joint_dist_sum = GetJointDist(robot_model_, joint_pos, &predicted_joint_states_per_roll[roll][start_timestep]);
+        double joint_dist_sum = GetJointDist(robot_model_, joint_pos, predicted_joint_states_per_roll[roll][start_timestep]);
         int roll_start_timestep = start_timestep;
         if(joint_dist_sum > joint_dist_cutoff)
         {
@@ -75,11 +74,11 @@ double ConfigSample::GetExpectedReward(int start_timestep, int num_timesteps, do
             double post_joint_dist_sum = std::numeric_limits<double>::infinity();
             if(start_timestep > 0)
             {
-                pre_joint_dist_sum = GetJointDist(robot_model_, joint_pos, &predicted_joint_states_per_roll[roll][start_timestep - 1]);
+                pre_joint_dist_sum = GetJointDist(robot_model_, joint_pos, predicted_joint_states_per_roll[roll][start_timestep - 1]);
             }
             if(start_timestep < predicted_joint_states_per_roll[roll].size() - 1)
             {
-                post_joint_dist_sum = GetJointDist(robot_model_, joint_pos, &predicted_joint_states_per_roll[roll][start_timestep + 1]);
+                post_joint_dist_sum = GetJointDist(robot_model_, joint_pos, predicted_joint_states_per_roll[roll][start_timestep + 1]);
             }
             if(pre_joint_dist_sum > joint_dist_cutoff && post_joint_dist_sum > joint_dist_cutoff)
             {
@@ -118,25 +117,19 @@ double ConfigSample::GetExpectedReward(int start_timestep, int num_timesteps, do
     }
 }
 
-void ConfigSample::GenerateRollouts(boost::shared_ptr<MotionState> starting_state, int num_rollouts, int num_timesteps, double timestep_size, boost::shared_ptr<UserModel> user_model)
+void ConfigSample::GenerateRollouts(const boost::shared_ptr<MotionState> starting_state, const int num_rollouts, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model)
 {
     avg_timestep_scores_per_roll.clear();
+    avg_timestep_scores_per_roll.resize(num_rollouts);
     predicted_joint_states_per_roll.clear();
+    predicted_joint_states_per_roll.resize(num_rollouts);
     rollout_sample_probabilities.clear();
+    rollout_sample_probabilities.resize(num_rollouts);
+
     std::vector<std::thread> threads;
     for(int i = 0; i < num_rollouts; ++i)
     {
-        std::vector<double> avg_timestep_scores;
-        std::vector<std::vector<double>> predicted_joint_states;
-        std::pair<int, double> rollout_probs;
-        avg_timestep_scores_per_roll.push_back(avg_timestep_scores);
-        predicted_joint_states_per_roll.push_back(predicted_joint_states);
-        rollout_sample_probabilities.push_back(rollout_probs);
-    }
-
-    for(int i = 0; i < num_rollouts; ++i)
-    {
-        threads.push_back(std::thread(&ConfigSample::GenerateRollout, this, starting_state, num_timesteps, timestep_size, user_model, &predicted_joint_states_per_roll[i], &avg_timestep_scores_per_roll[i], &rollout_sample_probabilities[i]));
+        threads.push_back(std::thread(&ConfigSample::GenerateRollout, this, starting_state, num_timesteps, timestep_size, user_model, std::ref(predicted_joint_states_per_roll[i]), std::ref(avg_timestep_scores_per_roll[i]), std::ref(rollout_sample_probabilities[i])));
     }
 
     for(int i = 0; i < num_rollouts; ++i)
@@ -146,7 +139,7 @@ void ConfigSample::GenerateRollouts(boost::shared_ptr<MotionState> starting_stat
     samples_generated = true;
 }
 
-void ConfigSample::GenerateRollout(boost::shared_ptr<MotionState> starting_state, int num_timesteps, double timestep_size, boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>* predicted_joint_states, std::vector<double>* rollout_rewards, std::pair<int, double>* sample_probs)
+void ConfigSample::GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states, std::vector<double>& rollout_rewards, std::pair<int, double>& sample_probs)
 {
     std::vector<boost::shared_ptr<MotionState>> rollout_states;
     rollout_states.push_back(starting_state);
@@ -159,7 +152,7 @@ void ConfigSample::GenerateRollout(boost::shared_ptr<MotionState> starting_state
         // Sample new user command
         std::vector<double> next_command;
         std::vector<double> next_desired_movement;
-        user_model_sample = user_model->RandomSample(rollout_states[rollout_states.size() - 1], &next_command, user_model_sample.first);
+        user_model_sample = user_model->RandomSample(rollout_states[rollout_states.size() - 1], next_command, user_model_sample.first);
         for(int k = 0; k < next_command.size(); ++k)
         {
             next_desired_movement.push_back(next_command[k] * timestep_size);
@@ -167,41 +160,39 @@ void ConfigSample::GenerateRollout(boost::shared_ptr<MotionState> starting_state
         
         // Calculate new joint velocities motion candidate
         std::vector<double> next_joint_vels;
-        GetJointVelocities(rollout_states[rollout_states.size() - 1], &next_command, &next_joint_vels);
+        GetJointVelocities(rollout_states[rollout_states.size() - 1], next_command, next_joint_vels);
         
         // Update state
         KDL::Frame ideal_position( KDL::Rotation::RPY(next_desired_movement[3], next_desired_movement[4], next_desired_movement[5]) * rollout_states[rollout_states.size() - 1]->position.M, 
             rollout_states[rollout_states.size() - 1]->position.p + KDL::Vector(next_desired_movement[0], next_desired_movement[1], next_desired_movement[2]));
-        boost::shared_ptr<MotionState> new_state(new MotionState(&(rollout_states[rollout_states.size() - 1]->joint_positions), &(rollout_states[rollout_states.size() - 1]->joint_velocities), 
-            &next_joint_vels, timestep_size, robot_model_, time_into_future));
+        boost::shared_ptr<MotionState> new_state(new MotionState(rollout_states[rollout_states.size() - 1]->joint_positions, rollout_states[rollout_states.size() - 1]->joint_velocities, 
+            next_joint_vels, timestep_size, robot_model_, time_into_future));
         // Calculate reward for new motion candidate
-        double timestep_score = reward_calculator_->EvaluateMotionCandidate(robot_model_, rollout_states[rollout_states.size() - 1], new_state, &ideal_position, false);
+        double timestep_score = reward_calculator_->EvaluateMotionCandidate(robot_model_, rollout_states[rollout_states.size() - 1], new_state, ideal_position, false);
         thread_mod_lock.lock();
-        rollout_rewards->push_back(timestep_score);
-        predicted_joint_states->push_back(rollout_states[rollout_states.size() - 1]->joint_positions);
+        rollout_rewards.push_back(timestep_score);
+        predicted_joint_states.push_back(rollout_states[rollout_states.size() - 1]->joint_positions);
         thread_mod_lock.unlock();
         rollout_states.push_back(new_state);
     }
-    sample_probs->first = user_model_sample.first;
-    sample_probs->second = user_model_sample.second;
+    sample_probs.first = user_model_sample.first;
+    sample_probs.second = user_model_sample.second;
 }
 
-double ConfigSample::GetDistToSample(Eigen::VectorXd* sample)
+double ConfigSample::GetDistToSample(const Eigen::VectorXd& sample) const
 {
     double sq_sum = 0.0;
     for(int i = 0; i < target_joint_pos.size(); ++i)
     {
-        sq_sum += pow(target_joint_pos[i] - (*sample)(i), 2.0);
+        sq_sum += pow(target_joint_pos[i] - sample(i), 2.0);
     }
     return pow(sq_sum, 0.5);
 }
 
-void ConfigSample::GetJointVelocities(boost::shared_ptr<MotionState> joint_start_state, std::vector<double>* ee_command, std::vector<double>* joint_vels) const
+void ConfigSample::GetJointVelocities(const boost::shared_ptr<MotionState> joint_start_state, std::vector<double> ee_command, std::vector<double>& joint_vels_out, const double gain) const
 {
-    double gain = 0.2;
-
     // Calculate primary movement
-    Eigen::VectorXd desired_velocity = Eigen::Map<Eigen::VectorXd>(&((*ee_command)[0]), ee_command->size());
+    const Eigen::VectorXd desired_velocity = Eigen::Map<Eigen::VectorXd>(&(ee_command[0]), ee_command.size());
     joint_start_state->CalculateJacobian(robot_model_);
     Eigen::VectorXd primary_movement = joint_start_state->pseudo_inverse * desired_velocity;
 
@@ -239,7 +230,7 @@ void ConfigSample::GetJointVelocities(boost::shared_ptr<MotionState> joint_start
     {
         total_movement = total_movement + null_space_*null_movement_eigen;
     }
-    joint_vels->clear();
+    joint_vels_out.clear();
     for(int i = 0; i < robot_model_->GetNumberOfJoints(); ++i)
     {
         if(abs(total_movement(i)) > robot_model_->GetJointVelLimit(i))
@@ -253,7 +244,7 @@ void ConfigSample::GetJointVelocities(boost::shared_ptr<MotionState> joint_start
                 total_movement(i) = -1 * robot_model_->GetJointVelLimit(i);
             }
         }
-        joint_vels->push_back(total_movement(i));
+        joint_vels_out.push_back(total_movement(i));
     }
 }
 

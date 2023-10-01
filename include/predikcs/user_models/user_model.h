@@ -48,7 +48,8 @@ protected:
     double last_velocity_command_norm_;
     std::random_device rd;
     std::default_random_engine random_generator;
-    std::uniform_real_distribution<double> random_distribution;
+    
+    mutable std::uniform_real_distribution<double> random_distribution;
 };
 
 }

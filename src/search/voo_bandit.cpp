@@ -98,7 +98,7 @@ void VooBandit::GenerateSamples(boost::shared_ptr<MotionState> current_state, bo
         robot_model_lock.lock();
         new_sample->GenerateRollouts(current_state, bandit_spec_->sample_rollouts, total_rollout_steps, bandit_spec_->delta_t, user_model);
         robot_model_lock.unlock();
-        double new_sample_reward = new_sample->GetExpectedReward(0, bandit_spec_->rollout_steps, bandit_spec_->gamma, &(current_state->joint_positions), user_model);
+        double new_sample_reward = new_sample->GetExpectedReward(0, bandit_spec_->rollout_steps, bandit_spec_->gamma, current_state->joint_positions, user_model);
         if(new_sample_reward > best_config_reward)
         {
             best_config_ = new_sample;
@@ -117,27 +117,27 @@ void VooBandit::GenerateSamples(boost::shared_ptr<MotionState> current_state, bo
     }
 }
 
-void VooBandit::GetCurrentBestJointVelocities(boost::shared_ptr<MotionState> current_state, std::vector<double>* current_ee_command, std::vector<double>* best_joint_velocities)
+void VooBandit::GetCurrentBestJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out)
 {
     robot_model_lock.lock();
-    best_config_->GetJointVelocities(current_state, current_ee_command, best_joint_velocities);
+    best_config_->GetJointVelocities(current_state, current_ee_command, best_joint_velocities_out);
     robot_model_lock.unlock();
 }
 
-void VooBandit::GetBaselineJointVelocities(boost::shared_ptr<MotionState> current_state, std::vector<double>* current_ee_command, std::vector<double>* best_joint_velocities)
+void VooBandit::GetBaselineJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out)
 {
     robot_model_lock.lock();
     ConfigSample baseline_config(robot_model_);
-    baseline_config.GetJointVelocities(current_state, current_ee_command, best_joint_velocities);
+    baseline_config.GetJointVelocities(current_state, current_ee_command, best_joint_velocities_out);
     robot_model_lock.unlock();
 }
 
-void VooBandit::GetCurrentBestConfig(std::vector<double>* best_config)
+void VooBandit::GetCurrentBestConfig(std::vector<double>& best_config)
 {
-    best_config->clear();
+    best_config.clear();
     for(int i = 0; i < best_config_->target_joint_pos.size(); ++i)
     {
-        best_config->push_back(best_config_->target_joint_pos[i]);
+        best_config.push_back(best_config_->target_joint_pos[i]);
     }
 }
 
@@ -175,7 +175,7 @@ double VooBandit::UpdateBestConfig(boost::shared_ptr<MotionState> start_state, b
         std::vector<boost::shared_ptr<ConfigSample>>::iterator it;
         for(it = samples[i].begin(); it != samples[i].end();)
         {
-            double sample_reward = (*it)->GetExpectedReward(starting_timestep, bandit_spec_->rollout_steps, bandit_spec_->gamma, &(start_state->joint_positions), user_model);
+            double sample_reward = (*it)->GetExpectedReward(starting_timestep, bandit_spec_->rollout_steps, bandit_spec_->gamma, start_state->joint_positions, user_model);
             if(sample_reward == -std::numeric_limits<double>::infinity())
             {
                 // Remove old sample that has gone bad on distance metric
@@ -209,7 +209,7 @@ double VooBandit::UpdateBestConfig(boost::shared_ptr<MotionState> start_state, b
     return best_config_reward;
 }
 
-void VooBandit::RandomSample(std::vector<double> &sample_target)
+void VooBandit::RandomSample(std::vector<double>& sample_target)
 {
     // Create new random sample
     for(int i = 0; i < no_joints; ++i)
@@ -217,7 +217,7 @@ void VooBandit::RandomSample(std::vector<double> &sample_target)
         sample_target.push_back(uniform_joint_distributions[i](random_generator));
     }
 }
-void VooBandit::VoronoiSample(std::vector<double> &sample_target, boost::shared_ptr<ConfigSample> best_config)
+void VooBandit::VoronoiSample(std::vector<double>& sample_target, boost::shared_ptr<ConfigSample> best_config)
 {
     // Create new sample in best Voronoi cell
     Eigen::VectorXd voronoi_cell_mean(no_joints);
@@ -233,14 +233,14 @@ void VooBandit::VoronoiSample(std::vector<double> &sample_target, boost::shared_
     for(int i = 0; i < bandit_spec_->max_voronoi_samples; ++i)
     {
         new_sample = noise_sample();
-        double dist_to_center = best_config->GetDistToSample(&new_sample);
+        double dist_to_center = best_config->GetDistToSample(new_sample);
         // Check if within Voronoi Cell
         bool in_voronoi = true;
         for(int j = 0; j < samples.size(); ++j)
         {
             for(int k = 0; k < samples[j].size(); ++k)
             {
-                double dist_to_sample = samples[j][k]->GetDistToSample(&new_sample);
+                double dist_to_sample = samples[j][k]->GetDistToSample(new_sample);
                 if(dist_to_sample < dist_to_center)
                 {
                     in_voronoi = false;

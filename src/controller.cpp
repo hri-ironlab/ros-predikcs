@@ -210,13 +210,6 @@ public:
 
         if(all_zeros || !vel_command_waiting)
         {
-            /*
-            boost::shared_ptr<predikcs::MotionState> current_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, last_joint_accelerations) );
-            current_state->CalculatePosition(robot);
-            double quat_x, quat_y, quat_z, quat_w;
-            current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
-            ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
-            */
             DecayCommand();
         }
         else if (baseline)
@@ -226,7 +219,7 @@ public:
             double quat_x, quat_y, quat_z, quat_w;
             current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
             ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
-            voo_bandit->GetBaselineJointVelocities(current_state, &last_velocity_command, &(current_fetch_command_msg->velocity));
+            voo_bandit->GetBaselineJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
         }
         else
         {
@@ -240,7 +233,7 @@ public:
             current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
             ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
             
-            voo_bandit->GetCurrentBestJointVelocities(current_state, &last_velocity_command, &(current_fetch_command_msg->velocity));
+            voo_bandit->GetCurrentBestJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
             if(update_goal_probabilities){
                 static_cast<predikcs::GoalClassifierUserModel*>(user.get())->UpdateProbabilities(current_state, last_velocity_command);
                 
@@ -257,7 +250,7 @@ public:
     void GenerateNewSamples()
     {
         // Add more samples while waiting for next command
-        boost::shared_ptr<predikcs::MotionState> next_state( new predikcs::MotionState(&last_joint_positions, &last_joint_velocities, &(current_fetch_command_msg->velocity), voo_spec->sampling_loop_rate, robot, 0.0) );
+        boost::shared_ptr<predikcs::MotionState> next_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, current_fetch_command_msg->velocity, voo_spec->sampling_loop_rate, robot, 0.0) );
         
         voo_bandit->GenerateSamples(next_state, user);
     }

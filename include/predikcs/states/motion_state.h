@@ -32,19 +32,19 @@ public:
         time_in_future = 0.0;
     }
 
-    // Constructor takes in a pointer to the starting joint positions, a set of old and new joint velocities and a timestamp over which to spin up toward and apply the new joint velocities
-    MotionState(std::vector<double>* starting_joint_positions, std::vector<double>* last_joint_velocities, std::vector<double>* given_joint_velocities, double motion_time, boost::shared_ptr<RobotModel> robot_model, double time_into_future)
+    // Constructor takes in a reference to the starting joint positions, a set of old and new joint velocities and a timestamp over which to spin up toward and apply the new joint velocities
+    MotionState(const std::vector<double>& starting_joint_positions, const std::vector<double>& last_joint_velocities, const std::vector<double>& given_joint_velocities, double motion_time, boost::shared_ptr<RobotModel> robot_model, double time_into_future)
     {
         double timestamp, time_increment, max_acceleration, current_velocity, current_position, target_velocity;
         time_increment = 0.01;
         max_acceleration = 0.04; //Panda: 0.25
         time_in_future = time_into_future;
-        for(int j = 0; j < (*starting_joint_positions).size(); j++)
+        for(int j = 0; j < starting_joint_positions.size(); j++)
         {
             timestamp = 0.0;
-            double current_velocity = (*last_joint_velocities)[j];
-            double current_position = (*starting_joint_positions)[j];
-            double target_velocity = (*given_joint_velocities)[j];
+            double current_velocity = last_joint_velocities[j];
+            double current_position = starting_joint_positions[j];
+            double target_velocity = given_joint_velocities[j];
             if(abs(target_velocity) > robot_model->GetJointVelLimit(j))
             {
                 target_velocity = copysign(robot_model->GetJointVelLimit(j), target_velocity);
@@ -62,7 +62,7 @@ public:
             }
             
             joint_velocities.push_back(current_velocity);
-            joint_accelerations.push_back((joint_velocities[j] - (*last_joint_velocities)[j]) / motion_time);
+            joint_accelerations.push_back((joint_velocities[j] - last_joint_velocities[j]) / motion_time);
             joint_positions.push_back(current_position);
             commanded_velocities.push_back(target_velocity);
 

@@ -11,9 +11,6 @@
 namespace predikcs
 {
 
-//Forward declares
-class RewardCalculator;
-
 //----------------------------------------------------------------------------------------------------------------------------
 // GoalClassifierUserModel definition
 
@@ -33,9 +30,9 @@ void GoalClassifierUserModel::SetGoals(const std::vector<std::vector<double>>& g
     goals.clear();
     for(int i = 0; i < goal_points.size(); ++i)
     {
-        boost::shared_ptr<KDL::Frame> new_goal = boost::shared_ptr<KDL::Frame>(new KDL::Frame( 
+        KDL::Frame new_goal( 
             KDL::Rotation::Quaternion(goal_points[i][3], goal_points[i][4], goal_points[i][5], goal_points[i][6]),
-            KDL::Vector(goal_points[i][0], goal_points[i][1], goal_points[i][2])));
+            KDL::Vector(goal_points[i][0], goal_points[i][1], goal_points[i][2]));
         goals.push_back(new_goal);
     }
     ResetProbabilities();
@@ -44,7 +41,7 @@ void GoalClassifierUserModel::SetGoals(const std::vector<std::vector<double>>& g
 void GoalClassifierUserModel::ResetProbabilities()
 {
     log_likelihoods.clear();
-    for(int i = 0;i < goals.size(); ++i)
+    for(int i = 0; i < goals.size(); ++i)
     {
         log_likelihoods.push_back(0.0);
     }
@@ -60,11 +57,11 @@ void GoalClassifierUserModel::UpdateProbabilities(boost::shared_ptr<MotionState>
     std::vector<double> rewards;
     for(int i = 0; i < goals.size(); ++i)
     {
-        double dist_to_start = RewardCalculator::CalculateDistance(&(state->position), &(*goals[i]), 1.0, 1.0);
+        double dist_to_start = CalculateDistance(state->position, goals[i], 1.0, 1.0);
         KDL::Frame resulting_position( KDL::Rotation::RPY(velocities[3]*action_timestep_, velocities[4]*action_timestep_, 
             velocities[5]*action_timestep_) * state->position.M, 
             state->position.p + KDL::Vector(velocities[0]*action_timestep_, velocities[1]*action_timestep_, velocities[2]*action_timestep_));
-        double dist_after_move = RewardCalculator::CalculateDistance(&resulting_position, &(*goals[i]), 1.0, 1.0);
+        double dist_after_move = CalculateDistance(resulting_position, goals[i], 1.0, 1.0);
         rewards.push_back(exp(dist_factor*(dist_to_start - dist_after_move)));
         reward_sum += rewards[i];
     }
@@ -78,7 +75,7 @@ void GoalClassifierUserModel::UpdateProbabilities(boost::shared_ptr<MotionState>
     probs_updated_since_last_calc = true;
 }
 
-void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilities)
+void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilities) const
 {
     // Calculates current normalized probabilities based on likelihoods of each goal
     probabilities.clear();
@@ -94,7 +91,7 @@ void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilitie
     goal_prob_lock.unlock();
 }
 
-void GoalClassifierUserModel::CalculateProbabilities()
+void GoalClassifierUserModel::CalculateProbabilities() const
 {
     if(log_likelihoods.size() == 0) return;
 
@@ -128,7 +125,7 @@ void GoalClassifierUserModel::CalculateProbabilities()
     probs_updated_since_last_calc = false;
 }
 
-double GoalClassifierUserModel::GetSampleProbability(int sample_bias)
+double GoalClassifierUserModel::GetSampleProbability(const int sample_bias) const
 {
     if(probs_updated_since_last_calc)
     {
@@ -166,7 +163,7 @@ std::pair<int, double> GoalClassifierUserModel::RandomSample(const boost::shared
     state->CalculatePosition(robot_model_);
     //Create normal distributions for each velocity primitive with mean of current velocity value and standard deviation 1/10th the size of the mean
     std::vector<std::normal_distribution<double>> velocity_distributions;
-    KDL::Twist target_twist = KDL::diff(state->position, *(goals[sampling_goal]));
+    KDL::Twist target_twist = KDL::diff(state->position, goals[sampling_goal]);
     for(int i = 0; i < 6; i++)
     {
         double target_mean;
