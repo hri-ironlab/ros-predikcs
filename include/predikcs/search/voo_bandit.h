@@ -31,40 +31,35 @@ class RewardCalculator;
 class RobotModel;
 class UserModel;
 
-class VooSpec
+struct VooSpec
 {
-public:
-    VooSpec()
-    {}
-    ~VooSpec()
-    {}
     // Probability of creating a new sample uniformly over the search space. With (1 - probability), sample is created in best Voronoi cell instead.
-    double uniform_sample_prob;
+    double uniform_sample_prob = 0.5;
     // How many timesteps of control to maintain samples for
-    int tau;
+    int tau = 1;
     // Number of rollouts per sample to create Monte Carlo estimate of reward
-    int sample_rollouts;
+    int sample_rollouts = 1;
     // How many user actions to evaluate per sample rollout
-    int rollout_steps;
+    int rollout_steps = 1;
     // Time between user actions in sample rollouts
-    double delta_t;
+    double delta_t = 1.0;
     // Discount factor between timesteps on rewards seen during sample rollout
-    double gamma;
+    double gamma = 1.0;
     // How much time can be used to create samples and determine target velocity, in seconds
-    double sampling_time_limit;
+    double sampling_time_limit = 1.0;
     // Max number of samples to generate when looking for one within a Voronoi Cell before just taking closest one
-    int max_voronoi_samples;
+    int max_voronoi_samples = 1;
     // Estimate of how much time will pass between calls to GenerateSamples
-    double sampling_loop_rate;
+    double sampling_loop_rate = 1.0;
 };
 
 struct normal_random_variable
 {
-    normal_random_variable(Eigen::MatrixXd const& covar)
+    normal_random_variable(const Eigen::MatrixXd& covar)
         : normal_random_variable(Eigen::VectorXd::Zero(covar.rows()), covar)
     {}
 
-    normal_random_variable(Eigen::VectorXd const& mean, Eigen::MatrixXd const& covar)
+    normal_random_variable(const Eigen::VectorXd& mean, const Eigen::MatrixXd& covar)
         : mean(mean)
     {
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigenSolver(covar);
@@ -92,19 +87,19 @@ public:
 
     void Initialize();
 
-    void GenerateSamples(boost::shared_ptr<MotionState> current_state, boost::shared_ptr<UserModel> user_model);
+    void GenerateSamples(const boost::shared_ptr<MotionState> current_state, const boost::shared_ptr<UserModel> user_model);
 
-    void GetCurrentBestJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out);
+    void GetCurrentBestJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out) const;
 
-    void GetBaselineJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out);
+    void GetBaselineJointVelocities(const boost::shared_ptr<MotionState> current_state, const std::vector<double>& current_ee_command, std::vector<double>& best_joint_velocities_out) const;
 
-    void GetCurrentBestConfig(std::vector<double>& best_config);
+    void GetCurrentBestConfig(std::vector<double>& best_config_out) const;
 
     boost::shared_ptr<VooSpec> bandit_spec_;
 private:
-    double UpdateBestConfig(boost::shared_ptr<MotionState> start_state, boost::shared_ptr<UserModel> user_model);
-    void RandomSample(std::vector<double> &sample_target);
-    void VoronoiSample(std::vector<double> &sample_target, boost::shared_ptr<ConfigSample> best_config);
+    double UpdateBestConfig(const boost::shared_ptr<MotionState> start_state, const boost::shared_ptr<UserModel> user_model);
+    void RandomSample(std::vector<double>& sample_target_out) const;
+    void VoronoiSample(std::vector<double>& sample_target_out, const boost::shared_ptr<ConfigSample> best_config) const;
 
     bool initialized;
     bool best_expiring;
@@ -113,12 +108,12 @@ private:
     std::vector< std::vector<boost::shared_ptr<ConfigSample>> > samples;
     int next_samples_timestep;
     Eigen::Matrix<double,Eigen::Dynamic, Eigen::Dynamic> sample_gaussian_covariance;
-    std::default_random_engine random_generator;
-    std::vector<std::uniform_real_distribution<double>> uniform_joint_distributions;
-    std::uniform_real_distribution<double> sample_type_distribution;
+    mutable std::default_random_engine random_generator;
+    mutable std::vector<std::uniform_real_distribution<double>> uniform_joint_distributions;
+    mutable std::uniform_real_distribution<double> sample_type_distribution;
     boost::shared_ptr<ConfigSample> best_config_;
     std::vector<boost::shared_ptr<ConfigSample>> best_timestep_configs_;
-    std::mutex robot_model_lock;
+    mutable std::mutex robot_model_lock;
 
     boost::shared_ptr<RobotModel> robot_model_;
     boost::shared_ptr<RewardCalculator> reward_calculator_;

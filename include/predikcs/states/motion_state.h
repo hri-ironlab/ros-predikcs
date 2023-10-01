@@ -21,23 +21,15 @@ class MotionState
 {
 public:
     // Constructor takes in a current joint position and the last velocity applied
-    MotionState(std::vector<double> last_joint_positions, std::vector<double> last_joint_velocities, std::vector<double> last_joint_accelerations)
-    {
-        joint_positions = last_joint_positions;
-        joint_velocities = last_joint_velocities;
-        joint_accelerations = last_joint_accelerations;
-        is_jacobian_calculated = false;
-        is_position_calculated = false;
-        is_manipulability_calculated = false;
-        time_in_future = 0.0;
-    }
+    MotionState(std::vector<double> last_joint_positions, std::vector<double> last_joint_velocities,
+                std::vector<double> last_joint_accelerations) : joint_positions(last_joint_positions), joint_velocities(last_joint_velocities), joint_accelerations(last_joint_accelerations)
+    {}
 
     // Constructor takes in a reference to the starting joint positions, a set of old and new joint velocities and a timestamp over which to spin up toward and apply the new joint velocities
-    MotionState(const std::vector<double>& starting_joint_positions, const std::vector<double>& last_joint_velocities, const std::vector<double>& given_joint_velocities, double motion_time, boost::shared_ptr<RobotModel> robot_model, double time_into_future)
+    MotionState(const std::vector<double>& starting_joint_positions, const std::vector<double>& last_joint_velocities, const std::vector<double>& given_joint_velocities, const double motion_time, const boost::shared_ptr<RobotModel> robot_model,
+                const double time_into_future, const double time_increment = 0.01, const double max_acceleration = 0.04)
     {
-        double timestamp, time_increment, max_acceleration, current_velocity, current_position, target_velocity;
-        time_increment = 0.01;
-        max_acceleration = 0.04; //Panda: 0.25
+        double timestamp, current_velocity, current_position, target_velocity;
         time_in_future = time_into_future;
         for(int j = 0; j < starting_joint_positions.size(); j++)
         {
@@ -93,29 +85,29 @@ public:
     ~MotionState()
     {}
 
-    void CalculateJacobian(boost::shared_ptr<RobotModel> robot_model) const
+    void CalculateJacobian(const boost::shared_ptr<RobotModel> robot_model) const
     {
         if(is_jacobian_calculated)
         {
             return;
         }
-        robot_model->GetJacobian(joint_positions, &jacobian);
+        robot_model->GetJacobian(joint_positions, jacobian);
         Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> jacobian_transpose = jacobian.transpose();
         pseudo_inverse = jacobian_transpose * (jacobian * jacobian_transpose).inverse();
         is_jacobian_calculated = true;
     }
 
-    void CalculatePosition(boost::shared_ptr<RobotModel> robot_model) const
+    void CalculatePosition(const boost::shared_ptr<RobotModel> robot_model) const
     {
         if(is_position_calculated)
         {
             return;
         }
-        robot_model->GetPosition(joint_positions, &position);
+        robot_model->GetPosition(joint_positions, position);
         is_position_calculated = true;
     }
 
-    void CalculateManipulability(boost::shared_ptr<RobotModel> robot_model) const
+    void CalculateManipulability(const boost::shared_ptr<RobotModel> robot_model) const
     {
         if(is_manipulability_calculated)
         {
@@ -136,12 +128,12 @@ public:
     double time_in_future = 0.0;
 
     // Values cached on calculations
-    mutable bool is_jacobian_calculated;
+    mutable bool is_jacobian_calculated = false;
     mutable Eigen::Matrix<double,6,Eigen::Dynamic> jacobian;
     mutable Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> pseudo_inverse;
-    mutable bool is_manipulability_calculated;
+    mutable bool is_manipulability_calculated = false;
     mutable double manipulability = 0.0;
-    mutable bool is_position_calculated;
+    mutable bool is_position_calculated = false;
     mutable KDL::Frame position;
 };
 

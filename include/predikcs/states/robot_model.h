@@ -36,11 +36,11 @@ public:
 
     int GetNumberOfJoints() const;
 
-    void GetJacobian(std::vector<double> joint_positions, Eigen::Matrix<double,6,Eigen::Dynamic>* jac) const;
+    void GetJacobian(const std::vector<double>& joint_positions, Eigen::Matrix<double,6,Eigen::Dynamic>& jac_out) const;
 
-    void GetJacobianDot(std::vector<double> joint_positions, int joint_index, Eigen::Matrix<double,6,Eigen::Dynamic>* jac_dot) const;
+    void GetJacobianDot(const std::vector<double>& joint_positions, const int joint_index, Eigen::Matrix<double,6,Eigen::Dynamic>& jac_dot_out) const;
 
-    void GetPosition(std::vector<double> joint_positions, KDL::Frame* position) const;
+    void GetPosition(const std::vector<double>& joint_positions, KDL::Frame& position_out) const;
 
     double GetJointPosUpLimit(const int joint_index) const;
 
@@ -49,8 +49,8 @@ public:
     double GetJointVelLimit(const int joint_index) const;
 
 private:
-    bool busy_;
-    bool initialized_;
+    bool busy_ = false;
+    bool initialized_ = true;
 
     std::vector<double> jnt_pos_up_limits_;
     std::vector<double> jnt_pos_down_limits_;

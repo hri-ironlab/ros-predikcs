@@ -69,7 +69,7 @@ int RobotModel::GetNumberOfJoints() const
     return kdl_chain_.getNrOfJoints();
 }
 
-void RobotModel::GetJacobian(std::vector<double> joint_positions, Eigen::Matrix<double,6,Eigen::Dynamic>* jac) const
+void RobotModel::GetJacobian(const std::vector<double>& joint_positions, Eigen::Matrix<double,6,Eigen::Dynamic>& jac_out) const
 {
     KDL::JntArray jnt_pos;
     KDL::Jacobian jacobian;
@@ -85,17 +85,17 @@ void RobotModel::GetJacobian(std::vector<double> joint_positions, Eigen::Matrix<
     jac_solver_->JntToJac(jnt_pos, jacobian);
     jac_solver_lock_.unlock();
 
-    jac->resize(jacobian.rows(), jacobian.columns());
+    jac_out.resize(jacobian.rows(), jacobian.columns());
     for(int i = 0; i < jacobian.rows(); ++i)
     {
         for(int j = 0; j < jacobian.columns(); ++j)
         {
-            (*jac)(i, j) = jacobian(i, j);
+            jac_out(i, j) = jacobian(i, j);
         }
     }
 }
 
-void RobotModel::GetJacobianDot(std::vector<double> joint_positions, int joint_index, Eigen::Matrix<double,6,Eigen::Dynamic>* jac_dot_) const
+void RobotModel::GetJacobianDot(const std::vector<double>& joint_positions, const int joint_index, Eigen::Matrix<double,6,Eigen::Dynamic>& jac_dot_out) const
 {
     KDL::Jacobian jacobian_dot;
     jacobian_dot.resize(kdl_chain_.getNrOfJoints());
@@ -114,17 +114,17 @@ void RobotModel::GetJacobianDot(std::vector<double> joint_positions, int joint_i
     jac_dot_solver_->JntToJacDot(system_state, jacobian_dot);
     jac_dot_solver_lock_.unlock();
 
-    jac_dot_->resize(jacobian_dot.rows(), jacobian_dot.columns());
+    jac_dot_out.resize(jacobian_dot.rows(), jacobian_dot.columns());
     for(int i = 0; i < jacobian_dot.rows(); ++i)
     {
         for(int j = 0; j < jacobian_dot.columns(); ++j)
         {
-            (*jac_dot_)(i, j) = jacobian_dot(i, j);
+            jac_dot_out(i, j) = jacobian_dot(i, j);
         }
     }
 }
 
-void RobotModel::GetPosition(std::vector<double> joint_positions, KDL::Frame* position) const
+void RobotModel::GetPosition(const std::vector<double>& joint_positions, KDL::Frame& position_out) const
 {
     KDL::JntArray jnt_pos;
     jnt_pos.resize(joint_positions.size());
@@ -134,21 +134,21 @@ void RobotModel::GetPosition(std::vector<double> joint_positions, KDL::Frame* po
         jnt_pos(i) = joint_positions[i];
     }
     jnt_to_pos_solver_lock_.lock();
-    jnt_to_pos_solver_->JntToCart(jnt_pos, *position);
+    jnt_to_pos_solver_->JntToCart(jnt_pos, position_out);
     jnt_to_pos_solver_lock_.unlock();
 }
 
-double RobotModel::GetJointPosUpLimit(int joint_index) const
+double RobotModel::GetJointPosUpLimit(const int joint_index) const
 {
     return jnt_pos_up_limits_[joint_index];
 }
 
-double RobotModel::GetJointPosDownLimit(int joint_index) const
+double RobotModel::GetJointPosDownLimit(const int joint_index) const
 {
     return jnt_pos_down_limits_[joint_index];
 }
 
-double RobotModel::GetJointVelLimit(int joint_index) const
+double RobotModel::GetJointVelLimit(const int joint_index) const
 {
     return jnt_vel_limits_[joint_index];
 }

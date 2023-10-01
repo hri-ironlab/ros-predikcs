@@ -26,18 +26,15 @@ double GetJointDist(const boost::shared_ptr<RobotModel> robot_model_, const std:
     return pow(joint_dist_sum, 0.5);
 }
 
-ConfigSample::ConfigSample(boost::shared_ptr<RobotModel> robot_model)
+ConfigSample::ConfigSample(boost::shared_ptr<RobotModel> robot_model) : robot_model_(robot_model)
 {
     // Null sample, has negative infinity reward
-    robot_model_ = robot_model;
     null_sample = true;
 }
 
-ConfigSample::ConfigSample(std::vector<double> target_joint_positions, boost::shared_ptr<RobotModel> robot_model, boost::shared_ptr<RewardCalculator> reward_calculator)
+ConfigSample::ConfigSample(std::vector<double> target_joint_positions, boost::shared_ptr<RobotModel> robot_model,
+                           boost::shared_ptr<RewardCalculator> reward_calculator) : target_joint_pos(target_joint_positions), robot_model_(robot_model), reward_calculator_(reward_calculator)
 {
-    target_joint_pos = target_joint_positions;
-    robot_model_ = robot_model;
-    reward_calculator_ = reward_calculator;
     samples_generated = false;
     null_sample = false;
 }
@@ -139,7 +136,7 @@ void ConfigSample::GenerateRollouts(const boost::shared_ptr<MotionState> startin
     samples_generated = true;
 }
 
-void ConfigSample::GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states, std::vector<double>& rollout_rewards, std::pair<int, double>& sample_probs)
+void ConfigSample::GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states_out, std::vector<double>& rollout_rewards_out, std::pair<int, double>& sample_probs_out)
 {
     std::vector<boost::shared_ptr<MotionState>> rollout_states;
     rollout_states.push_back(starting_state);
@@ -170,13 +167,13 @@ void ConfigSample::GenerateRollout(const boost::shared_ptr<MotionState> starting
         // Calculate reward for new motion candidate
         double timestep_score = reward_calculator_->EvaluateMotionCandidate(robot_model_, rollout_states[rollout_states.size() - 1], new_state, ideal_position, false);
         thread_mod_lock.lock();
-        rollout_rewards.push_back(timestep_score);
-        predicted_joint_states.push_back(rollout_states[rollout_states.size() - 1]->joint_positions);
+        rollout_rewards_out.push_back(timestep_score);
+        predicted_joint_states_out.push_back(rollout_states[rollout_states.size() - 1]->joint_positions);
         thread_mod_lock.unlock();
         rollout_states.push_back(new_state);
     }
-    sample_probs.first = user_model_sample.first;
-    sample_probs.second = user_model_sample.second;
+    sample_probs_out.first = user_model_sample.first;
+    sample_probs_out.second = user_model_sample.second;
 }
 
 double ConfigSample::GetDistToSample(const Eigen::VectorXd& sample) const

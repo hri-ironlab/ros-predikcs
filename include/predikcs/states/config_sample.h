@@ -42,7 +42,7 @@ public:
 
     void GenerateRollouts(const boost::shared_ptr<MotionState> starting_state, const int num_rollouts, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model);
 
-    void GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states, std::vector<double>& rollout_rewards, std::pair<int, double>& sample_probs);
+    void GenerateRollout(const boost::shared_ptr<MotionState> starting_state, const int num_timesteps, const double timestep_size, const boost::shared_ptr<UserModel> user_model, std::vector<std::vector<double>>& predicted_joint_states_out, std::vector<double>& rollout_rewards_out, std::pair<int, double>& sample_probs_out);
 
     double GetDistToSample(const Eigen::VectorXd& sample) const;
 
