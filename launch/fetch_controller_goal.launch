@@ -1,0 +1,51 @@
+<launch>
+    <param name="/use_simulated_time" type="bool" value="true" />
+    <node pkg="predikcs" name="KCS_Controller" type="predikcs_fetch" output="screen">
+        <param name="/planning_root_link" type="string" value="torso_lift_link" />
+        <param name="/planning_tip_link" type="string" value="gripper_link" />
+        <param name="/number_of_joints" type="int" value="7" />
+        <param name="/joint0_name" type="string" value="shoulder_pan_joint" />
+        <param name="/joint0_pos_up_limit" type="double" value="1.6057" />
+        <param name="/joint0_pos_down_limit" type="double" value="-1.6057" />
+        <param name="/joint0_vel_limit" type="double" value="0.7" />
+        <param name="/joint1_name" type="string" value="shoulder_lift_joint" />
+        <param name="/joint1_pos_up_limit" type="double" value="1.51844" />
+        <param name="/joint1_pos_down_limit" type="double" value="-1.22173" />
+        <param name="/joint1_vel_limit" type="double" value="0.7" />
+        <param name="/joint2_name" type="string" value="upperarm_roll_joint" />
+        <param name="/joint2_pos_up_limit" type="double" value="$(eval float('inf'))" />
+        <param name="/joint2_pos_down_limit" type="double" value="$(eval float('-inf'))" />
+        <param name="/joint2_vel_limit" type="double" value="0.8" />
+        <param name="/joint3_name" type="string" value="elbow_flex_joint" />
+        <param name="/joint3_pos_up_limit" type="double" value="2.25147" />
+        <param name="/joint3_pos_down_limit" type="double" value="-2.25147" />
+        <param name="/joint3_vel_limit" type="double" value="0.8" />
+        <param name="/joint4_name" type="string" value="forearm_roll_joint" />
+        <param name="/joint4_pos_up_limit" type="double" value="$(eval float('inf'))" />
+        <param name="/joint4_pos_down_limit" type="double" value="$(eval float('-inf'))" />
+        <param name="/joint4_vel_limit" type="double" value="0.8" />
+        <param name="/joint5_name" type="string" value="wrist_flex_joint" />
+        <param name="/joint5_pos_up_limit" type="double" value="2.18166" />
+        <param name="/joint5_pos_down_limit" type="double" value="-2.18166" />
+        <param name="/joint5_vel_limit" type="double" value="1.3" />
+        <param name="/joint6_name" type="string" value="wrist_roll_joint" />
+        <param name="/joint6_pos_up_limit" type="double" value="$(eval float('inf'))" />
+        <param name="/joint6_pos_down_limit" type="double" value="$(eval float('-inf'))" />
+        <param name="/joint6_vel_limit" type="double" value="1.3" />
+        <param name="/voo_spec/uniform_sample_prob" type="double" value="0.5" />
+        <param name="/voo_spec/tau" type="int" value="30" />
+        <param name="/voo_spec/sample_rollouts" type="int" value="7" />
+        <param name="/voo_spec/rollout_steps" type="int" value="12" />
+        <param name="/voo_spec/delta_t" type="double" value="1.0" />
+        <param name="/voo_spec/temporal_discount" type="double" value="0.95" />
+        <param name="/reward_params/distance" type="double" value="-50.0" />
+        <param name="/reward_params/jerk" type="double" value="0.0" />
+        <param name="/reward_params/manipulability" type="double" value="5.0" />
+        <param name="/reward_params/limits" type="double" value="-0.5" />
+        <param name="/user_model" type="int" value="1" />
+        <rosparam command="load" file="$(find predikcs)/config/goals.yaml" />
+        <remap from ="/planning_robot_urdf" to="/robot_description" />
+        <remap from ="/joint_commands" to="/arm_controller/joint_velocity/joint_commands" />
+    </node>
+
+</launch>

@@ -1,0 +1,2 @@
+# Goal Specification
+This directory contains an example specification of a possible goal set for the Goal Classifier example user model provided in this repo. This user model estimates probabilities of joint-space goals according to observed user actions, then allows sampling of possible future user actions according to this estimate. A fixed set of possible goals are used during this estimation process, given through the `.yaml` files in this directory.
