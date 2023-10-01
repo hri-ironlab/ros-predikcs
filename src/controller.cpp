@@ -30,40 +30,20 @@ public:
         // Set search parameters. These can be defined as needed but should be tuned for your use case
         // Longer rollouts will typically provide smoother movement for a given time interval, provided there is enough computational resources to gather a large number of samples (100+ active samples at any time)
         // Reward parameters can be configured to emphasize different components (or you can define a reward model that is entirely custom!)
-        baseline = false;
-        update_goal_probabilities = false;
         ReadParams();
         voo_spec->sampling_loop_rate = loop_rate;
         voo_spec->sampling_time_limit = loop_rate - (loop_rate / 10.0);
-        voo_spec->max_voronoi_samples = 10;
+        voo_spec->max_voronoi_samples = kMaxVoronoiSamples;
         voo_bandit = boost::shared_ptr<predikcs::VooBandit>(new predikcs::VooBandit(voo_spec, robot, reward));
-
-        current_fetch_command_msg = new sensor_msgs::JointState();
 
         last_velocity_command = std::vector<double>(6, 0);
         last_joint_positions = std::vector<double>(no_of_joints, 0);
         last_joint_velocities = std::vector<double>(no_of_joints, 0);
         last_joint_accelerations = std::vector<double>(no_of_joints, 0);
-        current_fetch_command_msg->velocity = std::vector<double>(no_of_joints, 0);
+        current_fetch_command_msg.velocity = std::vector<double>(no_of_joints, 0);
         last_joint_msg_time = 0;
         max_accel_factor = 4.0;
         vel_command_waiting = false;
-        PublishControllerSpec();
-    }
-
-    ~Controller()
-    {}
-
-    void PublishControllerSpec()
-    {
-        if(baseline)
-        {
-            ros::param::set("/teleop_type", "baseline");
-        }
-        else
-        {
-            ros::param::set("/teleop_type", (boost::format("Sample %.1f, Tau %d, Rolls %d, Roll Steps %d, Delta T %.1f, Gamma %.1f, Reward Params %.1f, %.1f, %.1f, %.1f") % voo_spec->uniform_sample_prob % voo_spec->tau % voo_spec->sample_rollouts % voo_spec->rollout_steps % voo_spec->delta_t % voo_spec->gamma % reward->GetDistWeight() % reward->GetJerkWeight() % reward->GetManipWeight() % reward->GetLimWeight()).str());
-        }
     }
 
     void ReadParams()
@@ -104,17 +84,15 @@ public:
         }
         goal_user->SetGoals(goals);
         user = goal_user;
-        update_goal_probabilities = true;
     }
 
     void JointUpdateCallback(const sensor_msgs::JointState::ConstPtr& msg)
     {
-        float k_min_update_time = 0.025;
         std::vector<double> new_joint_positions;
         std::vector<double> new_joint_velocities;
         std::vector<double> new_joint_accelerations;
         double joint_msg_time = msg->header.stamp.now().toSec();
-        if(joint_msg_time - last_joint_msg_time < k_min_update_time || msg->position.size() < joint_names.size())
+        if(joint_msg_time - last_joint_msg_time < kJointUpdateTime || msg->position.size() < joint_names.size())
         {
             return;
         }
@@ -161,25 +139,22 @@ public:
 
     void GripperCommandCallback(const control_msgs::GripperCommandActionGoal::ConstPtr& msg)
     {
-        if(update_goal_probabilities){
-            static_cast<predikcs::GoalClassifierUserModel*>(user.get())->ResetProbabilities();
-        }
+        // Reset probabilities of grasp goals whenever a grasp command is received
+        static_cast<predikcs::GoalClassifierUserModel*>(user.get())->ResetProbabilities();
     }
 
     void DecayCommand()
     {
-        double k_min_vel_command = 0.01;
-        double k_decay_factor = 1.25;
         // Exponentially decay velocity command
-        for(int i = 0; i < current_fetch_command_msg->velocity.size(); ++i)
+        for(int i = 0; i < current_fetch_command_msg.velocity.size(); ++i)
         {
-            if(abs(current_fetch_command_msg->velocity[i]) < k_min_vel_command)
+            if(abs(current_fetch_command_msg.velocity[i]) < kMinVelCommand)
             {
-                current_fetch_command_msg->velocity[i] = 0.0;
+                current_fetch_command_msg.velocity[i] = 0.0;
             }
             else
             {
-                current_fetch_command_msg->velocity[i] = current_fetch_command_msg->velocity[i] / k_decay_factor;
+                current_fetch_command_msg.velocity[i] = current_fetch_command_msg.velocity[i] / kDecayFactor;
             }
         }
     }
@@ -209,17 +184,10 @@ public:
         current_state->CalculatePosition(robot);
         double quat_x, quat_y, quat_z, quat_w;
         current_state->position.M.GetQuaternion(quat_x, quat_y, quat_z, quat_w);
-        ROS_ERROR("Current state: %.2f, %.2f, %.2f | %.2f, %.2f, %.2f, %.2f", current_state->position.p.x(), current_state->position.p.y(), current_state->position.p.z(), quat_x, quat_y, quat_z, quat_w);
         
-        voo_bandit->GetCurrentBestJointVelocities(current_state, last_velocity_command, current_fetch_command_msg->velocity);
-        if(update_goal_probabilities){
-            static_cast<predikcs::GoalClassifierUserModel*>(user.get())->UpdateProbabilities(current_state, last_velocity_command);
-            
-            std::vector<double> current_probs;
-            static_cast<predikcs::GoalClassifierUserModel*>(user.get())->GetProbabilities(current_probs);
-            ROS_ERROR("Current probs: %.2f %.2f %.2f %.2f %.2f %.2f", current_probs[0], current_probs[1], current_probs[2], current_probs[3], current_probs[4], current_probs[5]);
-            
-        }
+        voo_bandit->GetCurrentBestJointVelocities(current_state, last_velocity_command, current_fetch_command_msg.velocity);
+        static_cast<predikcs::GoalClassifierUserModel*>(user.get())->UpdateProbabilities(current_state, last_velocity_command);
+          
         PublishCommand();
         vel_command_waiting = false;
     }
@@ -227,7 +195,7 @@ public:
     void GenerateNewSamples()
     {
         // Add more samples while waiting for next command
-        boost::shared_ptr<predikcs::MotionState> next_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, current_fetch_command_msg->velocity, voo_spec->sampling_loop_rate, robot, 0.0) );
+        boost::shared_ptr<predikcs::MotionState> next_state( new predikcs::MotionState(last_joint_positions, last_joint_velocities, current_fetch_command_msg.velocity, voo_spec->sampling_loop_rate, robot, 0.0) );
         
         voo_bandit->GenerateSamples(next_state, user);
     }
@@ -235,15 +203,15 @@ public:
     void TrimAccel()
     {
         double max_accel = max_accel_factor * voo_spec->sampling_loop_rate;
-        for(int i = 0; i < current_fetch_command_msg->velocity.size(); ++i)
+        for(int i = 0; i < current_fetch_command_msg.velocity.size(); ++i)
         {
-            if(current_fetch_command_msg->velocity[i] == 0.0)
+            if(current_fetch_command_msg.velocity[i] == 0.0)
             {
                 continue;
             }
-            if(abs(current_fetch_command_msg->velocity[i] - last_joint_velocities[i]) > max_accel)
+            if(abs(current_fetch_command_msg.velocity[i] - last_joint_velocities[i]) > max_accel)
             {
-                current_fetch_command_msg->velocity[i] = last_joint_velocities[i] + copysign(max_accel, current_fetch_command_msg->velocity[i] - last_joint_velocities[i]);
+                current_fetch_command_msg.velocity[i] = last_joint_velocities[i] + copysign(max_accel, current_fetch_command_msg.velocity[i] - last_joint_velocities[i]);
             }
         }        
     }
@@ -251,14 +219,18 @@ public:
     void PublishCommand()
     {
         TrimAccel();
-        command_pub.publish(*(current_fetch_command_msg));
+        command_pub.publish(current_fetch_command_msg);
     }
 
     boost::shared_ptr<predikcs::VooSpec> voo_spec;
     boost::shared_ptr<predikcs::VooBandit> voo_bandit;
 
 private:
-    int user_model_type;
+    static constexpr double kJointUpdateTime = 0.025;
+    static constexpr double kDecayFactor = 1.25;
+    static constexpr double kMinVelCommand = 0.01;
+    static constexpr int kMaxVoronoiSamples = 10;
+
     int no_of_joints;
     ros::Subscriber joint_sub;
     ros::Subscriber vel_command_sub;
@@ -276,10 +248,8 @@ private:
     boost::shared_ptr<predikcs::UserModel> user;
     boost::shared_ptr<predikcs::RewardCalculator> reward;
     bool vel_command_waiting;
-    bool update_goal_probabilities;
-    bool baseline;
     std::string controller_spec;
-    sensor_msgs::JointState* current_fetch_command_msg;
+    sensor_msgs::JointState current_fetch_command_msg;
 };
 
 int main(int argc, char *argv[])
@@ -289,10 +259,16 @@ int main(int argc, char *argv[])
     ros::NodeHandle nh;
     ros::Duration(1.0).sleep();
 
-    Controller controller(nh, 0.1);
+    // Set the control loop frequency in Hz. Note that a fairly simple change is to run the sampling algorithms
+    // in one thread and have a separate thread checking the current-best nullspace motion, allowing the output
+    // to instead be event-based on new command messages rather than at a fixed control rate. Here, we implement
+    // with a fixed control rate for the sake of a fair comparison with other controllers during experimentation.
+    double kLoopFrequency = 10;
+
+    Controller controller(nh, 1.0 / (double) kLoopFrequency);
     ros::Duration(1.0).sleep();
     ros::AsyncSpinner spinner(1);
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(kLoopFrequency);
     spinner.start();
 
     while(ros::ok())

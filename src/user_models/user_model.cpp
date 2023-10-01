@@ -61,15 +61,15 @@ UserModel::UserModel(const int num_options, const double action_timestep) : rand
     }
 }
 
-std::pair<int, double> UserModel::RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample, const int sample_bias) const
+std::pair<int, double> UserModel::RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample_out, const int sample_bias) const
 {
     std::vector<std::vector<double>> movement_options;
     GenerateActionOptions(&movement_options, last_velocity_command_, 1);
     
-    sample.clear();
+    sample_out.clear();
     for(int i = 0; i < movement_options[0].size(); ++i)
     {
-        sample.push_back(movement_options[0][i]);
+        sample_out.push_back(movement_options[0][i]);
     }
     return std::pair<int, double>(-1, 1.0);
 }

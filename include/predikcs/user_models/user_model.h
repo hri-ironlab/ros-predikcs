@@ -29,7 +29,7 @@ public:
     virtual ~UserModel()
     {}
 
-    virtual std::pair<int, double> RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample, const int sample_bias) const;
+    virtual std::pair<int, double> RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample_out, const int sample_bias) const;
 
     virtual double GetSampleProbability(const int sample_bias) const { return 1.0; }
 

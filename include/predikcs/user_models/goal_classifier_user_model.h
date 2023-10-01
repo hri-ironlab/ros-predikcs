@@ -30,7 +30,7 @@ public:
 
     GoalClassifierUserModel(const int num_options, const double action_timestep);
 
-    std::pair<int, double> RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample, const int sample_bias) const override;
+    std::pair<int, double> RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample_out, const int sample_bias) const override;
 
     double GetSampleProbability(const int sample_bias) const override;
 
@@ -38,7 +38,7 @@ public:
 
     void SetGoals(const std::vector<std::vector<double>>& goal_points);
 
-    void GetProbabilities(std::vector<double>& probabilities) const;
+    void GetProbabilities(std::vector<double>& probabilities_out) const;
 
     void ResetProbabilities();
 

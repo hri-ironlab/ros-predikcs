@@ -48,7 +48,7 @@ void GoalClassifierUserModel::ResetProbabilities()
     probs_updated_since_last_calc = true;
 }
 
-void GoalClassifierUserModel::UpdateProbabilities(boost::shared_ptr<MotionState> state, const std::vector<double>& velocities)
+void GoalClassifierUserModel::UpdateProbabilities(const boost::shared_ptr<MotionState> state, const std::vector<double>& velocities)
 {
     // Calculate reward (improvement in distance) for each goal
     state->CalculatePosition(robot_model_);
@@ -75,10 +75,10 @@ void GoalClassifierUserModel::UpdateProbabilities(boost::shared_ptr<MotionState>
     probs_updated_since_last_calc = true;
 }
 
-void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilities) const
+void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilities_out) const
 {
     // Calculates current normalized probabilities based on likelihoods of each goal
-    probabilities.clear();
+    probabilities_out.clear();
     if(probs_updated_since_last_calc)
     {
         CalculateProbabilities();
@@ -86,7 +86,7 @@ void GoalClassifierUserModel::GetProbabilities(std::vector<double>& probabilitie
     goal_prob_lock.lock();
     for(int i = 0; i < goal_probabilities.size(); ++i)
     {
-        probabilities.push_back(goal_probabilities[i]);
+        probabilities_out.push_back(goal_probabilities[i]);
     }
     goal_prob_lock.unlock();
 }
@@ -137,7 +137,7 @@ double GoalClassifierUserModel::GetSampleProbability(const int sample_bias) cons
     return result;
 }
 
-std::pair<int, double> GoalClassifierUserModel::RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample, const int sample_bias) const
+std::pair<int, double> GoalClassifierUserModel::RandomSample(const boost::shared_ptr<MotionState> state, std::vector<double>& sample_out, const int sample_bias) const
 {
     std::vector<double> goal_probs;
     GetProbabilities(goal_probs);
@@ -190,11 +190,11 @@ std::pair<int, double> GoalClassifierUserModel::RandomSample(const boost::shared
     }
     vel_norm = sqrt(vel_norm);
 
-    sample.clear();
+    sample_out.clear();
     double target_norm = std::max(last_velocity_command_norm_, 0.1);
     for(int i = 0; i < velocity_primitive.size(); ++i)
     {
-        sample.push_back((velocity_primitive[i] / vel_norm) * target_norm);
+        sample_out.push_back((velocity_primitive[i] / vel_norm) * target_norm);
     }
     return std::pair<int, double>(sampling_goal, goal_probs[sampling_goal]);
 }
